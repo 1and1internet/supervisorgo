@@ -1,4 +1,5 @@
 Attempt at a drop-in replacement of the python supervisor program.
+We wanted to remove python from some of our images as it adds bloat.
 
 There are a number of unsupported / incomplete features. However, for the
 purposes that we are using it for it should be complete enough.
@@ -31,3 +32,9 @@ or just remove that section completely :-)
 
 You might want to set [supervisord] logfile to /dev/stdout to see what it's
 doing.
+
+
+In order to see it running with the test_files provided, set the program arguements to
+
+```-c test_files/etc/supervisord.conf
+```
