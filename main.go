@@ -33,5 +33,5 @@ func main() {
 	allConfig := managed_procs.LoadAllConfig(supervisorConf)
 	allConfig.SuperVisorD.Nodaemon = *nodaemon
 	allConfig.SuperVisorD.LogLevel = loglevel
-	allConfig.RunAllProcesses2()
+	allConfig.RunAllProcesses()
 }

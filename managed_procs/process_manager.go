@@ -11,6 +11,7 @@ import (
 
 type ProcStatus int
 
+// Ref: http://supervisord.org/subprocess.html#process-states
 const (
 	PROC_STOPPED  ProcStatus = iota
 	PROC_STARTING
@@ -28,7 +29,7 @@ type Program struct {
 	startCount             int
 	stdout                 *os.File
 	stderr                 *os.File
-	channel                chan string
+	channel                chan ProcStatus
 	commandPath            string
 	programStatusTimestamp time.Time
 }
@@ -38,97 +39,32 @@ type RunningData struct {
 	allConfig AllConfig
 }
 
-func (allConfig AllConfig) RunAllProcesses()  {
-	progChannelRef := make(map[string]chan string)
-	for _, prog := range allConfig.Programs {
-		if prog.AutoStart {
-			progChan := make(chan string)
-			progChannelRef[prog.ProcessName] = progChan
-			go prog.ManageProcess(progChan)
-		}
+func stateToString(state ProcStatus) (string) {
+	switch state {
+	case PROC_STOPPED:
+		return "STOPPED"
+	case PROC_RUNNING:
+		return "RUNNING"
+	case PROC_STARTING:
+		return "STARTING"
+	case PROC_FATAL:
+		return "FATAL"
+	case PROC_BACKOFF:
+		return "BACKOFF"
+	case PROC_EXITED:
+		return "EXITED"
+	case PROC_STOPPING:
+		return "STOPPING"
 	}
-
-	for {
-		for processName, progChan := range progChannelRef {
-			select {
-			case exitStatus :=  <-progChan:
-				fmt.Printf("'%s' ended with '%s'\n", processName, exitStatus)
-				delete(progChannelRef, processName)
-			default:
-				fmt.Print(".")
-				time.Sleep(1 * time.Second)
-			}
-		}
-		if len(progChannelRef) == 0 {
-			return
-		}
-	}
-}
-
-func (programConfig ProgramConfigSection) ManageProcess(progChan chan string) {
-	path, err := exec.LookPath(programConfig.Command[0])
-	if err != nil {
-		fmt.Printf("Could not find command: %s\n", err)
-		return
-	}
-
-	args := []string{}
-	if len(programConfig.Command) > 1 {
-		args = programConfig.Command[1:]
-	}
-	fmt.Printf("Path %s Args %s\n", path, args)
-	cmd := exec.Command(path, args...)
-
-	stdout, stdouterr := os.Create(programConfig.StdoutLogfile)
-	if stdouterr != nil {
-		fmt.Printf("Could not create %s", programConfig.StdoutLogfile)
-	}
-	defer stdout.Close()
-
-	stderr, stderrerr := os.Create(programConfig.StderrLogfile)
-	if stderrerr != nil {
-		fmt.Printf("Could not create %s", programConfig.StdoutLogfile)
-	}
-	defer stderr.Close()
-
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	runerr := cmd.Start()
-	if runerr != nil {
-		progChan <- "START_FAILURE"
-		close(progChan)
-	}
-	exitVal := cmd.Wait()
-	var exitValStatus string
-	if exitVal != nil {
-		exitValStatus = fmt.Sprintf("EXIT_%v", exitVal)
-	} else {
-		exitValStatus = "EXIT_OK"
-	}
-
-	progChan <- exitValStatus
-	close(progChan)
+	return "unknown"
 }
 
 func (program *Program) UpdateStatus(status ProcStatus) {
 	program.programStatus = status
 	program.programStatusTimestamp = time.Now()
-	var programStatusVal = "unknown"
-	switch program.programStatus {
-	case PROC_STOPPED:
-		programStatusVal = "PROC_STOPPED"
-	case PROC_RUNNING:
-		programStatusVal = "PROC_RUNNING"
-	case PROC_STARTING:
-		programStatusVal = "PROC_STARTING"
-	case PROC_FATAL:
-		programStatusVal = "PROC_FATAL"
-	case PROC_BACKOFF:
-		programStatusVal = "PROC_BACKOFF"
-	case PROC_EXITED:
-		programStatusVal = "PROC_EXITED"
-	}
-	fmt.Printf("%s changed state to %v\n", program.config.ProcessName, programStatusVal)
+	fmt.Printf("Process '%s' changed state to '%s'\n",
+		program.config.ProcessName,
+		stateToString(program.programStatus))
 }
 
 func (allConfig AllConfig) InitialiseProcesses() []*Program {
@@ -138,7 +74,7 @@ func (allConfig AllConfig) InitialiseProcesses() []*Program {
 			config:        programConfig,
 			exitStatus:    "",
 			startCount:    0,
-			channel:       make(chan string),
+			channel:       make(chan ProcStatus),
 		}
 		aProgram.UpdateStatus(PROC_STOPPED)
 
@@ -149,21 +85,23 @@ func (allConfig AllConfig) InitialiseProcesses() []*Program {
 			continue
 		}
 		aProgram.commandPath = path
-
-		aProgram.channel = make(chan string)
-
+		aProgram.channel = make(chan ProcStatus)
 		programs = append(programs, &aProgram)
 	}
 	return programs
 }
 
-func (allConfig AllConfig) RunAllProcesses2() {
+func (allConfig AllConfig) RunAllProcesses() {
 	runningData := RunningData{
 		programs: allConfig.InitialiseProcesses(),
 		allConfig: allConfig,
 	}
-	runningData.StartRunableProcesses()
-	runningData.MonitorRunningProcesses()
+	for _, prog := range runningData.programs {
+		if prog.config.AutoStart {
+			prog.StartRunableProcess()
+		}
+	}
+	runningData.MonitorRunningProcesses2()
 }
 
 func (runningData RunningData) MonitorRunningProcesses() {
@@ -185,7 +123,7 @@ func (runningData RunningData) MonitorRunningProcesses() {
 			case PROC_RUNNING:
 				count++
 			default:
-				runningData.StartRunableProcesses()
+				runningData.StartAllRunableProcesses()
 			}
 
 		}
@@ -197,7 +135,7 @@ func (runningData RunningData) MonitorRunningProcesses() {
 }
 
 func (runningData RunningData) MonitorRunningProcesses2() {
-	var chans []chan string
+	var chans []chan ProcStatus
 	for _, program := range runningData.programs {
 		chans = append(chans, program.channel)
 	}
@@ -206,34 +144,72 @@ func (runningData RunningData) MonitorRunningProcesses2() {
 		cases[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ch)}
 	}
 	for {
-		chosen, value, ok := reflect.Select(cases)
-		if ok {
-			ch := chans[chosen]
-			msg := value.String()
-			fmt.Printf("TEST %s\n", msg)
-			for _, program := range runningData.programs {
-				if program.channel == ch {
-
-				}
+		potentially_running_processes := false
+		for _, program := range runningData.programs {
+			switch program.programStatus {
+			case PROC_EXITED:
+				potentially_running_processes = true
+				break
+			case PROC_BACKOFF:
+				potentially_running_processes = true
+				break
+			case PROC_STARTING:
+				potentially_running_processes = true
+				break
+			case PROC_RUNNING:
+				potentially_running_processes = true
+				break
+			case PROC_STOPPING:
+				potentially_running_processes = true
+				break
 			}
 		}
+		if potentially_running_processes {
+			chosen, value, ok := reflect.Select(cases)
+			if ok {
+				ch := chans[chosen]
+				state := value.Interface().(ProcStatus)
+				for _, program := range runningData.programs {
+					if program.channel == ch {
+						// If we are supposed to start it again then do so
+						program.UpdateStatus(state)
+						program.StartRunableProcess()
+						break
+					}
+				}
+			} else {
+				potentially_running_processes = false
+			}
+		}
+
+		if !potentially_running_processes {
+			fmt.Println("Nothing to do, waiting...")
+			time.Sleep(5 * time.Second)
+		}
+
 	}
 }
 
-func (runningData RunningData) StartRunableProcesses() {
+func (prog *Program) StartRunableProcess() {
+	switch prog.programStatus {
+	case PROC_STOPPED:
+		fmt.Printf("Starting %s\n", prog.config.ProcessName)
+		prog.UpdateStatus(PROC_STARTING)
+		prog.startCount++
+		go prog.RunSingleProcess()
+	case PROC_BACKOFF:
+		prog.startCount++
+		prog.TryRestart()
+	case PROC_EXITED:
+		prog.startCount = 0
+		prog.TryRestart()
+	}
+}
+
+func (runningData RunningData) StartAllRunableProcesses() {
 	for _, prog := range runningData.programs {
 		if prog.config.AutoStart {
-			switch prog.programStatus {
-			case PROC_STOPPED:
-				fmt.Printf("Starting %s\n", prog.config.ProcessName)
-				prog.UpdateStatus(PROC_STARTING)
-				prog.startCount++
-				go prog.RunSingleProcess()
-			case PROC_BACKOFF:
-				prog.TryRestart()
-			case PROC_EXITED:
-				prog.TryRestart()
-			}
+			prog.StartRunableProcess()
 		}
 	}
 }
@@ -242,16 +218,15 @@ func (prog *Program) TryRestart() {
 	if prog.CanRestart() {
 		fmt.Printf("Restarting %s\n", prog.config.ProcessName)
 		prog.UpdateStatus(PROC_STARTING)
-		prog.startCount++
 		go prog.RunSingleProcess()
 	} else {
-		fmt.Printf("%s has failed and cannot restart\n", prog.config.ProcessName)
 		prog.UpdateStatus(PROC_FATAL)
+		fmt.Printf("Process '%s' will not restart automatically\n", prog.config.ProcessName)
 	}
 }
 
 func (program *Program) CanRestart() (bool) {
-	if program.startCount >= program.config.StartRetries {
+	if program.programStatus == PROC_BACKOFF && program.startCount > program.config.StartRetries {
 		return false
 	}
 
@@ -315,22 +290,22 @@ func (program *Program) RunSingleProcess() {
 	cmd.Stderr = program.stderr
 	runerr := cmd.Start()
 	if runerr != nil {
-		program.UpdateStatus(PROC_BACKOFF)
-		program.channel <- "changed"
+		//program.UpdateStatus(PROC_BACKOFF)
+		program.channel <- PROC_BACKOFF
 		return
 	}
 
-	program.UpdateStatus(PROC_RUNNING)
-	program.channel <- "changed"
+	//program.UpdateStatus(PROC_RUNNING)
+	program.channel <- PROC_RUNNING
 	exitVal := cmd.Wait()
 
 	if exitVal != nil {
 		program.exitStatus = fmt.Sprintf("%v", exitVal)
-		program.UpdateStatus(PROC_BACKOFF)
-		program.channel <- "changed"
+		//program.UpdateStatus(PROC_BACKOFF)
+		program.channel <- PROC_BACKOFF
 	} else {
 		program.exitStatus = "0"
-		program.UpdateStatus(PROC_EXITED)
-		program.channel <- "changed"
+		//program.UpdateStatus(PROC_EXITED)
+		program.channel <- PROC_EXITED
 	}
 }
