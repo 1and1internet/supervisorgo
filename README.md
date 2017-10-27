@@ -24,7 +24,8 @@ Too many other 'features' that we don't use to mention
 
 It will be necessary to comment out the command in the eventlistener i.e.
 ```[eventlistener:fatal_check]
-#command=bash test_files/bin/exit_on_fatal.sh```
+#command=bash test_files/bin/exit_on_fatal.sh
+```
 
 or just remove that section completely :-)
 
