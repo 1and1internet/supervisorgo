@@ -3,6 +3,9 @@ package main
 import (
 	"flag"
 	"fasthosts.com/supervisorgo/managed_procs"
+	"os"
+	"log"
+	"fmt"
 )
 
 func main() {
@@ -33,5 +36,15 @@ func main() {
 	allConfig := managed_procs.LoadAllConfig(supervisorConf)
 	allConfig.SuperVisorD.Nodaemon = *nodaemon
 	allConfig.SuperVisorD.LogLevel = loglevel
+
+	loggingFilename := allConfig.SuperVisorD.LogFile
+	fmt.Printf("Supervisor is logging to %s\n", loggingFilename)
+	f, err := os.OpenFile(loggingFilename, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	defer f.Close()
+	log.SetOutput(f)
+
 	allConfig.RunAllProcesses()
 }

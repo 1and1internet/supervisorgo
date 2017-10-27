@@ -2,7 +2,6 @@ package managed_procs
 
 import (
 	"os"
-	"log"
 	"github.com/go-ini/ini"
 	"strings"
 	"fmt"
@@ -116,7 +115,7 @@ func LoadAllConfig(supervisorConf *string) (AllConfig) {
 
 	iniConfig, err := ini.Load(superConfigFile)
 	if err != nil {
-		log.Printf("Impossible ini: [%s] [%v]", superConfigFile, err)
+		fmt.Printf("Issue opening ini: [%s] [%v]", superConfigFile, err)
 		return allConfig
 	}
 
@@ -133,7 +132,7 @@ func LoadAllConfig(supervisorConf *string) (AllConfig) {
 	return allConfig
 }
 
-func (allConfig AllConfig) HandleOtherConfigSections(iniSection *ini.Section, sectionName string) {
+func (allConfig *AllConfig) HandleOtherConfigSections(iniSection *ini.Section, sectionName string) {
 	if strings.HasPrefix(sectionName, "eventlistener") {
 		name := strings.Split(sectionName, ":")[1]
 		_, ok := allConfig.EventListeners[name]
@@ -162,7 +161,7 @@ func (allConfig AllConfig) HandleOtherConfigSections(iniSection *ini.Section, se
 						fmt.Printf("Loading %s\n", file)
 						includedIniConfig, err2 := ini.Load(file)
 						if err2 != nil {
-							fmt.Printf("Impossible ini(2): [%s] [%v]\n", file, err)
+							fmt.Printf("Issue opening ini(2): [%s] [%v]\n", file, err)
 						} else {
 							for _, sectionName := range includedIniConfig.SectionStrings() {
 								fmt.Printf("Section: %s\n", sectionName)
@@ -183,7 +182,7 @@ func (allConfig AllConfig) HandleOtherConfigSections(iniSection *ini.Section, se
 	}
 }
 
-func (allConfig AllConfig) LoadSuperConfig(section *ini.Section) {
+func (allConfig *AllConfig) LoadSuperConfig(section *ini.Section) {
 	var err error
 	for _, key := range section.KeyStrings() {
 		fmt.Printf("		%s = %v\n", key, section.Key(key))
@@ -341,7 +340,7 @@ func (configFileSection *ProgramConfigSection) LoadProgram(section *ini.Section,
 	}
 }
 
-func (allConfig AllConfig) LoadEventListener(section *ini.Section, name string) {
+func (allConfig *AllConfig) LoadEventListener(section *ini.Section, name string) {
 	var err error
 
 	programSection := GetDefaultProgramSection(name)
