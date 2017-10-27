@@ -34,7 +34,9 @@ You might want to set [supervisord] logfile to /dev/stdout to see what it's
 doing.
 
 
-In order to see it running with the test_files provided, set the program arguements to
+In order to see it running with the test_files provided, set the program
+arguements to
 
-```-c test_files/etc/supervisord.conf
+```
+-c test_files/etc/supervisord.conf
 ```
