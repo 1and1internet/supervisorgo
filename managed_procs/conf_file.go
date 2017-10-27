@@ -25,6 +25,7 @@ type SuperConfigSection struct {
 	StripAnsi       bool
 	Environment     string
 	Identifier      string
+	ExitOn			string
 }
 
 type EventListenerConfigSection struct {
@@ -219,6 +220,8 @@ func (allConfig *AllConfig) LoadSuperConfig(section *ini.Section) {
 			allConfig.SuperVisorD.Environment = section.Key(key).String()
 		} else if key == "identifier" {
 			allConfig.SuperVisorD.Identifier = section.Key(key).String()
+		} else if key == "exit_on" {
+			allConfig.SuperVisorD.ExitOn = section.Key(key).String()
 		}
 
 		if err != nil {
@@ -345,6 +348,8 @@ func (allConfig *AllConfig) LoadEventListener(section *ini.Section, name string)
 
 	programSection := GetDefaultProgramSection(name)
 	programSection.LoadProgram(section, name)
+	// The event listener is another program to run...
+	allConfig.Programs[name] = programSection
 
 	eventListenerSection := EventListenerConfigSection{
 		BufferSize: "",

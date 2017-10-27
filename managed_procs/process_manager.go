@@ -79,6 +79,12 @@ func (allConfig AllConfig) InitialiseProcesses() []*Program {
 		}
 		aProgram.UpdateStatus(PROC_STOPPED)
 
+		if len(aProgram.config.Command) == 0 {
+			log.Printf("No command specified for %s\n", aProgram.config.ProcessName)
+			aProgram.UpdateStatus(PROC_FATAL)
+			continue
+		}
+
 		path, err := exec.LookPath(aProgram.config.Command[0])
 		if err != nil {
 			log.Printf("Could not find command: %s\n", err)
@@ -133,6 +139,10 @@ func (runningData RunningData) MonitorRunningProcesses() {
 			case PROC_STOPPING:
 				potentially_running_processes = true
 				break
+			case PROC_FATAL:
+				if runningData.allConfig.SuperVisorD.ExitOn == "ANY_FATAL" {
+					log.Fatal("Exiting due to ANY_FATAL")
+				}
 			}
 		}
 		if potentially_running_processes {
@@ -154,6 +164,9 @@ func (runningData RunningData) MonitorRunningProcesses() {
 		}
 
 		if !potentially_running_processes {
+			if runningData.allConfig.SuperVisorD.ExitOn == "ALL_FATAL" {
+				log.Fatal("Exiting due to ALL_FATAL")
+			}
 			log.Println("Nothing to do, waiting...")
 			time.Sleep(5 * time.Second)
 		}
