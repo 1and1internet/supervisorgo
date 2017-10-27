@@ -4,7 +4,8 @@ We wanted to remove python from some of our images as it adds bloat.
 There are a number of unsupported / incomplete features. However, for the
 purposes that we are using it for it should be complete enough.
 
-It doesn't handle eventlisteners, but it's possible to add this line to
+It doesn't handle eventlisteners, but it's possible to add this line to make
+it exit if any child fails completely.
 
 ```
 [supervisord]
