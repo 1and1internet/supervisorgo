@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"1and1internet/supervisorgo/managed_procs"
+	"github.com/1and1internet/supervisorgo/managed_procs"
 	"os"
 	"log"
 	"fmt"
