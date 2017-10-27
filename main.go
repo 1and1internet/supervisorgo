@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"fasthosts.com/supervisorgo/managed_procs"
+	"1and1internet/supervisorgo/managed_procs"
 	"os"
 	"log"
 	"fmt"
