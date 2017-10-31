@@ -8,6 +8,7 @@ import (
 	"strings"
 	"reflect"
 	"fmt"
+	"syscall"
 )
 
 type ProcStatus int
@@ -33,6 +34,7 @@ type Program struct {
 	channel                chan ProcStatus
 	commandPath            string
 	programStatusTimestamp time.Time
+	command                *exec.Cmd
 }
 
 type RunningData struct {
@@ -227,7 +229,7 @@ func (program *Program) CanRestart() (bool) {
 	return false
 }
 
-func (program *Program) RunSingleProcess() {
+func (program *Program) CreateCommand() (*exec.Cmd) {
 	var cmd *exec.Cmd
 
 	if len(program.config.Command) > 1 {
@@ -239,7 +241,25 @@ func (program *Program) RunSingleProcess() {
 		log.Printf("Running %s\n", program.commandPath)
 		cmd = exec.Command(program.commandPath)
 	}
+	program.command = cmd
+	return cmd
+}
 
+func (program *Program) SetPriority() {
+	cmd := program.command
+	err_prio := syscall.Setpriority(syscall.PRIO_PROCESS, cmd.Process.Pid, program.config.Priority)
+	if err_prio == nil {
+		actualPriority, err_getprio := syscall.Getpriority(syscall.PRIO_PROCESS, cmd.Process.Pid)
+		if err_getprio == nil {
+			log.Printf("PRIORITY: Process %s priority requested %d, set %d",
+				program.config.ProcessName, program.config.Priority, actualPriority)
+		}
+	} else {
+		log.Printf("PRIORITY: Could not set priority for process %s", program.config.ProcessName)
+	}
+}
+
+func (program *Program) SetIO() {
 	// Connect stdout
 	if program.config.StdoutLogfile == "" || program.config.StdoutLogfile == "AUTO" {
 		program.config.StdoutLogfile = "/dev/stdout"
@@ -248,7 +268,6 @@ func (program *Program) RunSingleProcess() {
 	if stdouterr != nil {
 		log.Printf("Could not create %s", program.config.StdoutLogfile)
 	}
-	defer stdout.Close()
 	program.stdout = stdout
 
 	// Connect stderr
@@ -259,16 +278,26 @@ func (program *Program) RunSingleProcess() {
 	if stderrerr != nil {
 		log.Printf("Could not create %s", program.config.StdoutLogfile)
 	}
-	defer stderr.Close()
 	program.stderr = stderr
 
-	cmd.Stdout = program.stdout
-	cmd.Stderr = program.stderr
+	program.command.Stdout = program.stdout
+	program.command.Stderr = program.stderr
+}
+
+func (program *Program) RunSingleProcess() {
+	cmd := program.CreateCommand()
+
+	program.SetIO()
+	defer program.stdout.Close()
+	defer program.stderr.Close()
+
 	runerr := cmd.Start()
 	if runerr != nil {
 		program.channel <- PROC_BACKOFF
 		return
 	}
+
+	program.SetPriority()
 
 	program.channel <- PROC_RUNNING
 	exitVal := cmd.Wait()
