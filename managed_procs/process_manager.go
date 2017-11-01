@@ -35,6 +35,7 @@ type Program struct {
 	commandPath            string
 	programStatusTimestamp time.Time
 	command                *exec.Cmd
+	startable              bool
 }
 
 type RunningData struct {
@@ -74,10 +75,11 @@ func (allConfig AllConfig) InitialiseProcesses() []*Program {
 	programs := []*Program{}
 	for _, programConfig := range allConfig.Programs {
 		aProgram := Program{
-			config:        programConfig,
-			exitStatus:    "",
-			startCount:    0,
-			channel:       make(chan ProcStatus),
+			config:     programConfig,
+			exitStatus: "",
+			startCount: 0,
+			channel:    make(chan ProcStatus),
+			startable:  false,
 		}
 		aProgram.UpdateStatus(PROC_STOPPED)
 
@@ -107,6 +109,7 @@ func (allConfig AllConfig) RunAllProcesses() {
 	}
 	for _, prog := range runningData.programs {
 		if prog.config.AutoStart {
+			prog.startable = true
 			prog.StartRunableProcess()
 		}
 	}
@@ -123,23 +126,24 @@ func (runningData RunningData) MonitorRunningProcesses() {
 		cases[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ch)}
 	}
 	for {
-		potentially_running_processes := false
+		potentially_runable_processes := false
 		for _, program := range runningData.programs {
 			switch program.programStatus {
 			case PROC_EXITED:
-				potentially_running_processes = true
+				potentially_runable_processes = true
 				break
 			case PROC_BACKOFF:
-				potentially_running_processes = true
+				potentially_runable_processes = true
 				break
 			case PROC_STARTING:
-				potentially_running_processes = true
+				potentially_runable_processes = true
 				break
 			case PROC_RUNNING:
-				potentially_running_processes = true
+				program.SetPriority()
+				potentially_runable_processes = true
 				break
 			case PROC_STOPPING:
-				potentially_running_processes = true
+				potentially_runable_processes = true
 				break
 			case PROC_FATAL:
 				if runningData.allConfig.SuperVisorD.ExitOn == "ANY_FATAL" {
@@ -147,7 +151,7 @@ func (runningData RunningData) MonitorRunningProcesses() {
 				}
 			}
 		}
-		if potentially_running_processes {
+		if potentially_runable_processes {
 			chosen, value, ok := reflect.Select(cases)
 			if ok {
 				ch := chans[chosen]
@@ -161,11 +165,11 @@ func (runningData RunningData) MonitorRunningProcesses() {
 					}
 				}
 			} else {
-				potentially_running_processes = false
+				potentially_runable_processes = false
 			}
 		}
 
-		if !potentially_running_processes {
+		if !potentially_runable_processes {
 			if runningData.allConfig.SuperVisorD.ExitOn == "ALL_FATAL" {
 				log.Fatal("Exiting due to ALL_FATAL")
 			}
@@ -179,10 +183,12 @@ func (runningData RunningData) MonitorRunningProcesses() {
 func (prog *Program) StartRunableProcess() {
 	switch prog.programStatus {
 	case PROC_STOPPED:
-		log.Printf("Starting %s\n", prog.config.ProcessName)
-		prog.UpdateStatus(PROC_STARTING)
-		prog.startCount++
-		go prog.RunSingleProcess()
+		if prog.startable {
+			log.Printf("Starting %s\n", prog.config.ProcessName)
+			prog.UpdateStatus(PROC_STARTING)
+			prog.startCount++
+			go prog.RunSingleProcess()
+		}
 	case PROC_BACKOFF:
 		prog.startCount++
 		prog.TryRestart()
@@ -197,6 +203,8 @@ func (prog *Program) TryRestart() {
 		log.Printf("Restarting %s\n", prog.config.ProcessName)
 		prog.UpdateStatus(PROC_STARTING)
 		go prog.RunSingleProcess()
+	} else if prog.programStatus == PROC_STOPPED || prog.programStatus == PROC_EXITED {
+		log.Printf("%s is %s, not restarting\n", prog.config.ProcessName, stateToString(prog.programStatus))
 	} else {
 		prog.UpdateStatus(PROC_FATAL)
 		log.Printf("Process '%s' will not restart automatically\n", prog.config.ProcessName)
@@ -247,15 +255,15 @@ func (program *Program) CreateCommand() (*exec.Cmd) {
 
 func (program *Program) SetPriority() {
 	cmd := program.command
-	err_prio := syscall.Setpriority(syscall.PRIO_PROCESS, cmd.Process.Pid, program.config.Priority)
-	if err_prio == nil {
-		actualPriority, err_getprio := syscall.Getpriority(syscall.PRIO_PROCESS, cmd.Process.Pid)
-		if err_getprio == nil {
-			log.Printf("PRIORITY: Process %s priority requested %d, set %d",
-				program.config.ProcessName, program.config.Priority, actualPriority)
-		}
+	var err error
+	err = syscall.Setpriority(syscall.PRIO_PROCESS, cmd.Process.Pid, program.config.Priority)
+	if err == nil {
+		log.Printf("PRIORITY: Process %s priority set %d",
+				program.config.ProcessName, program.config.Priority)
+
 	} else {
 		log.Printf("PRIORITY: Could not set priority for process %s", program.config.ProcessName)
+		log.Println(err)
 	}
 }
 
@@ -296,8 +304,6 @@ func (program *Program) RunSingleProcess() {
 		program.channel <- PROC_BACKOFF
 		return
 	}
-
-	program.SetPriority()
 
 	program.channel <- PROC_RUNNING
 	exitVal := cmd.Wait()
