@@ -221,15 +221,18 @@ func (program *Program) CanRestart() (bool) {
 	}
 
 	if program.config.AutoRestart == "unexpected" {
-		if strings.HasPrefix(program.exitStatus, "exit status ") {
-			exitStatus := program.exitStatus[12:]
-			expectedCodes := strings.Split(program.config.ExitCodes, ",")
-			for _, expectedCode := range expectedCodes {
-				if expectedCode == exitStatus {
-					return true
-				}
+		exitStatus := program.exitStatus
+		log.Printf("Handling 'unexpected' exit, status: %s", exitStatus)
+		if strings.HasPrefix(exitStatus, "exit status ") {
+			exitStatus = program.exitStatus[12:]
+		}
+		expectedCodes := strings.Split(program.config.ExitCodes, ",")
+		for _, expectedCode := range expectedCodes {
+			if expectedCode == exitStatus {
+				return true
 			}
 		}
+
 		log.Printf("Unexpected error (%s)\n", program.exitStatus)
 		log.Printf("Expecting (%s)\n", program.config.ExitCodes)
 	}
