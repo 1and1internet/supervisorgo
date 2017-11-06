@@ -139,7 +139,6 @@ func (runningData RunningData) MonitorRunningProcesses() {
 				potentially_runable_processes = true
 				break
 			case PROC_RUNNING:
-				program.SetPriority()
 				potentially_runable_processes = true
 				break
 			case PROC_STOPPING:
@@ -152,15 +151,23 @@ func (runningData RunningData) MonitorRunningProcesses() {
 			}
 		}
 		if potentially_runable_processes {
+			// We will wait at this Select until one of our child processes changes state
+			// and notifies us...
 			chosen, value, ok := reflect.Select(cases)
 			if ok {
 				ch := chans[chosen]
 				state := value.Interface().(ProcStatus)
+				// Find the program that uses this channel, then act.
 				for _, program := range runningData.programs {
 					if program.channel == ch {
-						// If we are supposed to start it again then do so
 						program.UpdateStatus(state)
-						program.StartRunableProcess()
+						if state == PROC_RUNNING {
+							program.SetPriority()
+						} else {
+							// If we are supposed to start it again then do so
+							program.StartRunableProcess()
+						}
+
 						break
 					}
 				}
