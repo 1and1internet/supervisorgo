@@ -113,6 +113,7 @@ func (allConfig AllConfig) RunAllProcesses() {
 			prog.StartRunableProcess()
 		}
 	}
+	runningData.SignalHandlers()
 	runningData.MonitorRunningProcesses()
 }
 
