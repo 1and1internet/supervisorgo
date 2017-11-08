@@ -56,6 +56,7 @@ func (runningData RunningData) KillAllProcessesAndDie() {
 func (runningData RunningData) SigKill() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGKILL)
+	log.Println("Capturing SIGKILL")
 	s := <-c
 	fmt.Println("Got signal", s)
 	runningData.KillAllProcessesAndDie()
@@ -64,6 +65,7 @@ func (runningData RunningData) SigKill() {
 func (runningData RunningData) SigTerm() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGTERM)
+	log.Println("Capturing SIGTERM")
 	s := <-c
 	fmt.Println("Got signal", s)
 	runningData.KillAllProcessesAndDie()
@@ -72,6 +74,7 @@ func (runningData RunningData) SigTerm() {
 func (runningData RunningData) SigInt() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT)
+	log.Println("Capturing SIGINT")
 	s := <-c
 	fmt.Println("Got signal", s)
 	runningData.KillAllProcessesAndDie()
