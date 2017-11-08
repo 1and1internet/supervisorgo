@@ -17,31 +17,39 @@ func (runningData RunningData) KillAllProcessesAndDie() {
 			program.channel <- PROC_FATAL
 			switch program.config.StopSignal {
 			case "TERM":
+				log.Printf("Killing %s with SIGTERM", program.config.ProcessName)
 				err = program.command.Process.Signal(syscall.SIGTERM)
 			case "HUP":
+				log.Printf("Killing %s with SIGHUP", program.config.ProcessName)
 				err = program.command.Process.Signal(syscall.SIGHUP)
 			case "INT":
+				log.Printf("Killing %s with SIGINT", program.config.ProcessName)
 				err = program.command.Process.Signal(syscall.SIGINT)
 			case "QUIT":
+				log.Printf("Killing %s with SIGQUIT", program.config.ProcessName)
 				err = program.command.Process.Signal(syscall.SIGQUIT)
 			case "USR1":
+				log.Printf("Killing %s with SIGUSR1", program.config.ProcessName)
 				err = program.command.Process.Signal(syscall.SIGUSR1)
 			case "USR2":
+				log.Printf("Killing %s with SIGUSR2", program.config.ProcessName)
 				err = program.command.Process.Signal(syscall.SIGUSR2)
 			case "KILL":
+				log.Printf("Killing %s with SIGKILL", program.config.ProcessName)
 				err = program.command.Process.Kill()
 			default:
+				log.Printf("Killing %s with SIGKILL", program.config.ProcessName)
 				err = program.command.Process.Kill()
 			}
 			if err != nil &&
 						program.config.StopSignal != "QUIT" &&
 						!strings.Contains(err.Error(), "process already finished") {
-				log.Printf("Tried to kill %s but got %s. Sending QUIT signal.", program.config.ProcessName, err)
+				log.Printf("Tried to kill %s but got %s. Sending SIGQUIT signal.", program.config.ProcessName, err)
 				program.command.Process.Signal(syscall.SIGQUIT)
 			}
 		}
 	}
-	// Note: We are unlikely to get here due to the process manager killing us first
+	// Note: We might not get here due to the process manager killing us first
 	log.Fatal("End")
 }
 
