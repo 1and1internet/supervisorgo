@@ -121,7 +121,7 @@ func LoadAllConfig(supervisorConf *string) (AllConfig) {
 	}
 
 	for _, sectionName := range iniConfig.SectionStrings() {
-		fmt.Printf("Section: %s\n", sectionName)
+		//fmt.Printf("Section: %s\n", sectionName)
 		section, _ := iniConfig.GetSection(sectionName)
 		if sectionName == "supervisord" {
 			allConfig.LoadSuperConfig(section)
@@ -159,13 +159,13 @@ func (allConfig *AllConfig) HandleOtherConfigSections(iniSection *ini.Section, s
 				files, err := filepath.Glob(fileglob)
 				if err == nil {
 					for _, file := range files {
-						fmt.Printf("Loading %s\n", file)
+						//fmt.Printf("Loading %s\n", file)
 						includedIniConfig, err2 := ini.Load(file)
 						if err2 != nil {
 							fmt.Printf("Issue opening ini(2): [%s] [%v]\n", file, err)
 						} else {
 							for _, sectionName := range includedIniConfig.SectionStrings() {
-								fmt.Printf("Section: %s\n", sectionName)
+								//fmt.Printf("Section: %s\n", sectionName)
 								section, _ := includedIniConfig.GetSection(sectionName)
 								if sectionName == "supervisord" {
 									fmt.Printf("Ignoring supervisord section in %s\n", file)
@@ -186,7 +186,7 @@ func (allConfig *AllConfig) HandleOtherConfigSections(iniSection *ini.Section, s
 func (allConfig *AllConfig) LoadSuperConfig(section *ini.Section) {
 	var err error
 	for _, key := range section.KeyStrings() {
-		fmt.Printf("		%s = %v\n", key, section.Key(key))
+		//fmt.Printf("		%s = %v\n", key, section.Key(key))
 
 		if key == "logfile" {
 			allConfig.SuperVisorD.LogFile = section.Key(key).String()
@@ -270,7 +270,7 @@ func (configFileSection *ProgramConfigSection) LoadProgram(section *ini.Section,
 	var err error
 
 	for _, key := range section.KeyStrings() {
-		fmt.Printf("		%s = %v\n", key, section.Key(key))
+		//fmt.Printf("		%s = %v\n", key, section.Key(key))
 
 		if key == "command" {
 			commandParts := strings.Split(section.Key(key).String(), " ")
@@ -359,7 +359,7 @@ func (allConfig *AllConfig) LoadEventListener(section *ini.Section, name string)
 	}
 
 	for _, key := range section.KeyStrings() {
-		fmt.Printf("		%s = %v\n", key, section.Key(key))
+		//fmt.Printf("		%s = %v\n", key, section.Key(key))
 
 		if key == "buffer_size" {
 			eventListenerSection.BufferSize = section.Key(key).String()
