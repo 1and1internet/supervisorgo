@@ -130,25 +130,13 @@ func (runningData RunningData) MonitorRunningProcesses() {
 		potentially_runable_processes := false
 		for _, program := range runningData.programs {
 			switch program.programStatus {
-			case PROC_EXITED:
-				potentially_runable_processes = true
-				break
-			case PROC_BACKOFF:
-				potentially_runable_processes = true
-				break
-			case PROC_STARTING:
-				potentially_runable_processes = true
-				break
-			case PROC_RUNNING:
-				potentially_runable_processes = true
-				break
-			case PROC_STOPPING:
-				potentially_runable_processes = true
-				break
 			case PROC_FATAL:
 				if runningData.allConfig.SuperVisorD.ExitOn == "ANY_FATAL" {
 					log.Fatal("Exiting due to ANY_FATAL")
 				}
+			default:
+				potentially_runable_processes = true
+				break
 			}
 		}
 		if potentially_runable_processes {
