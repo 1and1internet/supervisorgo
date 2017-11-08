@@ -42,10 +42,10 @@ func (runningData RunningData) KillAllProcessesAndDie() {
 				err = program.command.Process.Kill()
 			}
 			if err != nil &&
-						program.config.StopSignal != "QUIT" &&
+						program.config.StopSignal != "KILL" &&
 						!strings.Contains(err.Error(), "process already finished") {
-				log.Printf("Tried to kill %s but got %s. Sending SIGQUIT signal.", program.config.ProcessName, err)
-				program.command.Process.Signal(syscall.SIGQUIT)
+				log.Printf("Tried to kill %s but got %s. Sending SIGKILL signal.", program.config.ProcessName, err)
+				program.command.Process.Signal(syscall.SIGKILL)
 			}
 		}
 	}
