@@ -6,12 +6,14 @@ import (
 	"syscall"
 	"fmt"
 	"log"
+	"strings"
 )
 
 func (runningData RunningData) KillAllProcessesAndDie() {
 	var err error
 	for _, program := range runningData.programs {
-		if program.programStatus != PROC_FATAL {
+		status := program.programStatus
+		if status != PROC_FATAL && status != PROC_EXITED && status != PROC_STOPPED {
 			program.channel <- PROC_FATAL
 			switch program.config.StopSignal {
 			case "TERM":
@@ -31,7 +33,9 @@ func (runningData RunningData) KillAllProcessesAndDie() {
 			default:
 				err = program.command.Process.Kill()
 			}
-			if err != nil && program.config.StopSignal != "QUIT" {
+			if err != nil &&
+						program.config.StopSignal != "QUIT" &&
+						!strings.Contains(err.Error(), "process already finished") {
 				log.Printf("Tried to kill %s but got %s. Sending QUIT signal.", program.config.ProcessName, err)
 				program.command.Process.Signal(syscall.SIGQUIT)
 			}
