@@ -272,9 +272,31 @@ func (configFileSection *ProgramConfigSection) LoadProgram(section *ini.Section,
 	for _, key := range section.KeyStrings() {
 		//fmt.Printf("		%s = %v\n", key, section.Key(key))
 
+		// If something is quoted, the quotes should be stripped and the content of the quotes should become 1 arg.
+		// i.e. bash -c "source stuff && do/otherStuff.sh"
+		// becomes ["bash", "-c", "source stuff && do/otherStuff.sh"], not
+		// becomes ["bash", "-c", "\"source stuff && do/otherStuff.sh\""]
+
 		if key == "command" {
 			commandParts := strings.Split(section.Key(key).String(), " ")
-			configFileSection.Command = append(configFileSection.Command, commandParts...)
+			var realCommandParts []string
+			inQuotes := false
+			quoted := ""
+			for _, commandPart := range commandParts {
+				if ! inQuotes && commandPart[0] == '"' {
+					inQuotes = true
+					quoted = commandPart[1:]
+				} else if inQuotes && commandPart[len(commandPart)-1] != '"' {
+					quoted = fmt.Sprintf("%s %s", quoted, commandPart)
+				} else if inQuotes {
+					inQuotes = false
+					quoted = fmt.Sprintf("%s %s", quoted, commandPart[:len(commandPart)-1])
+					realCommandParts = append(realCommandParts, quoted)
+				} else {
+					realCommandParts = append(realCommandParts, commandPart)
+				}
+			}
+			configFileSection.Command = append(configFileSection.Command, realCommandParts...)
 		} else if key == "process_name" {
 			configFileSection.ProcessName = section.Key(key).String()
 		} else if key == "numprocs" {
