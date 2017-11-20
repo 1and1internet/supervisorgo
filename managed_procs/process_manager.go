@@ -167,6 +167,7 @@ func (runningData RunningData) MonitorRunningProcesses() {
 
 		if !potentially_runable_processes {
 			if runningData.allConfig.SuperVisorD.ExitOn == "ALL_FATAL" {
+				syscall.Exit(3)
 				log.Fatal("Exiting due to ALL_FATAL")
 			}
 			log.Println("Nothing to do, waiting...")
