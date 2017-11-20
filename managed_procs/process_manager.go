@@ -36,11 +36,13 @@ type Program struct {
 	programStatusTimestamp time.Time
 	command                *exec.Cmd
 	startable              bool
+	exitCode               int
 }
 
 type RunningData struct {
 	programs  []*Program
 	allConfig AllConfig
+	inShutDown bool
 }
 
 func stateToString(state ProcStatus) (string) {
@@ -106,6 +108,7 @@ func (allConfig AllConfig) RunAllProcesses() {
 	runningData := RunningData{
 		programs: allConfig.InitialiseProcesses(),
 		allConfig: allConfig,
+		inShutDown: false,
 	}
 	for _, prog := range runningData.programs {
 		if prog.config.AutoStart {
@@ -131,7 +134,7 @@ func (runningData RunningData) MonitorRunningProcesses() {
 		for _, program := range runningData.programs {
 			switch program.programStatus {
 			case PROC_FATAL:
-				if runningData.allConfig.SuperVisorD.ExitOn == "ANY_FATAL" {
+				if runningData.allConfig.SuperVisorD.ExitOn == "ANY_FATAL" && !runningData.inShutDown {
 					syscall.Exit(2)
 				}
 			default:
@@ -166,7 +169,7 @@ func (runningData RunningData) MonitorRunningProcesses() {
 		}
 
 		if !potentially_runable_processes {
-			if runningData.allConfig.SuperVisorD.ExitOn == "ALL_FATAL" {
+			if runningData.allConfig.SuperVisorD.ExitOn == "ALL_FATAL" && !runningData.inShutDown {
 				syscall.Exit(3)
 				log.Fatal("Exiting due to ALL_FATAL")
 			}
@@ -310,9 +313,20 @@ func (program *Program) RunSingleProcess() {
 
 	if exitVal != nil {
 		program.exitStatus = fmt.Sprintf("%v", exitVal)
+		program.exitCode = 99
+
+		exiterr, ok := exitVal.(*exec.ExitError)
+		if ok {
+			status, ok := exiterr.Sys().(syscall.WaitStatus)
+			if ok {
+				program.exitCode = status.ExitStatus()
+			}
+		}
+
 		program.channel <- PROC_BACKOFF
 	} else {
 		program.exitStatus = "0"
+		program.exitCode = 0
 		program.channel <- PROC_EXITED
 	}
 }
