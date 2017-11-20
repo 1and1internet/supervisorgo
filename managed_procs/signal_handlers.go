@@ -9,11 +9,10 @@ import (
 	"strings"
 )
 
-func (runningData RunningData) KillAllProcessesAndDie() {
+func (runningData *RunningData) KillAllProcessesAndDie() {
 	var err error
 	var exitOK = true
 	runningData.inShutDown = true
-	fmt.Println("Set shutdown == true")
 	for _, program := range runningData.programs {
 		status := program.programStatus
 		if status != PROC_FATAL && status != PROC_EXITED && status != PROC_STOPPED {
