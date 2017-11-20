@@ -11,6 +11,7 @@ import (
 
 func (runningData RunningData) KillAllProcessesAndDie() {
 	var err error
+	var exitOK = true
 	for _, program := range runningData.programs {
 		status := program.programStatus
 		if status != PROC_FATAL && status != PROC_EXITED && status != PROC_STOPPED {
@@ -48,9 +49,14 @@ func (runningData RunningData) KillAllProcessesAndDie() {
 				program.command.Process.Signal(syscall.SIGKILL)
 			}
 		}
+
+		exitOK = exitOK && program.command.ProcessState.Success()
 	}
 	// Note: We might not get here due to the process manager killing us first
-	log.Fatal("End")
+	if exitOK {
+		syscall.Exit(0)
+	}
+	syscall.Exit(1)
 }
 
 func (runningData RunningData) SigTerm() {

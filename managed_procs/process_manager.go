@@ -132,7 +132,7 @@ func (runningData RunningData) MonitorRunningProcesses() {
 			switch program.programStatus {
 			case PROC_FATAL:
 				if runningData.allConfig.SuperVisorD.ExitOn == "ANY_FATAL" {
-					log.Fatal("Exiting due to ANY_FATAL")
+					syscall.Exit(0)
 				}
 			default:
 				potentially_runable_processes = true
