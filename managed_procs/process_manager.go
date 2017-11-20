@@ -129,11 +129,13 @@ func (runningData RunningData) MonitorRunningProcesses() {
 	for i, ch := range chans {
 		cases[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ch)}
 	}
+	fmt.Printf("0 inShutDown %v", runningData.inShutDown)
 	for {
 		potentially_runable_processes := false
 		for _, program := range runningData.programs {
 			switch program.programStatus {
 			case PROC_FATAL:
+				fmt.Printf("2 inShutDown %v", runningData.inShutDown)
 				if runningData.allConfig.SuperVisorD.ExitOn == "ANY_FATAL" && !runningData.inShutDown {
 					syscall.Exit(2)
 				}
@@ -169,9 +171,9 @@ func (runningData RunningData) MonitorRunningProcesses() {
 		}
 
 		if !potentially_runable_processes {
+			fmt.Printf("3 inShutDown %v", runningData.inShutDown)
 			if runningData.allConfig.SuperVisorD.ExitOn == "ALL_FATAL" && !runningData.inShutDown {
 				syscall.Exit(3)
-				log.Fatal("Exiting due to ALL_FATAL")
 			}
 			log.Println("Nothing to do, waiting...")
 			time.Sleep(5 * time.Second)
