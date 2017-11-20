@@ -120,7 +120,7 @@ func (allConfig AllConfig) RunAllProcesses() {
 	runningData.MonitorRunningProcesses()
 }
 
-func (runningData RunningData) MonitorRunningProcesses() {
+func (runningData *RunningData) MonitorRunningProcesses() {
 	var chans []chan ProcStatus
 	for _, program := range runningData.programs {
 		chans = append(chans, program.channel)
@@ -135,6 +135,7 @@ func (runningData RunningData) MonitorRunningProcesses() {
 			switch program.programStatus {
 			case PROC_FATAL:
 				if runningData.allConfig.SuperVisorD.ExitOn == "ANY_FATAL" && !runningData.inShutDown {
+					fmt.Println("two")
 					syscall.Exit(2)
 				}
 			default:
@@ -170,6 +171,7 @@ func (runningData RunningData) MonitorRunningProcesses() {
 
 		if !potentially_runable_processes {
 			if runningData.allConfig.SuperVisorD.ExitOn == "ALL_FATAL" && !runningData.inShutDown {
+				fmt.Println("three")
 				syscall.Exit(3)
 			}
 			log.Println("Nothing to do, waiting...")

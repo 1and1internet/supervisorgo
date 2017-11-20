@@ -16,11 +16,13 @@ func (runningData *RunningData) KillAllProcessesAndDie() {
 	for _, program := range runningData.programs {
 		status := program.programStatus
 		if status != PROC_FATAL && status != PROC_EXITED && status != PROC_STOPPED {
-			program.channel <- PROC_FATAL
+			//program.channel <- PROC_FATAL
 			switch program.config.StopSignal {
 			case "TERM":
+				fmt.Println("c")
 				log.Printf("Killing %s with SIGTERM", program.config.ProcessName)
 				err = program.command.Process.Signal(syscall.SIGTERM)
+				fmt.Println("d")
 			case "HUP":
 				log.Printf("Killing %s with SIGHUP", program.config.ProcessName)
 				err = program.command.Process.Signal(syscall.SIGHUP)
@@ -51,7 +53,7 @@ func (runningData *RunningData) KillAllProcessesAndDie() {
 			}
 		}
 
-		exitOK = exitOK && program.command.ProcessState.Success()
+		exitOK = exitOK && (program.exitCode == 0)
 	}
 	// Note: We might not get here due to the process manager killing us first
 	if exitOK {
