@@ -50,13 +50,15 @@ func (runningData *RunningData) KillAllProcessesAndDie() {
 				program.command.Process.Signal(syscall.SIGKILL)
 			}
 		}
-
+		log.Printf("%s exited with %d (%v)", program.config.ProcessName, program.exitCode, exitOK)
 		exitOK = exitOK && (program.exitCode == 0)
 	}
 	// Note: We might not get here due to the process manager killing us first
 	if exitOK {
+		log.Println("Exiting with code 0")
 		syscall.Exit(0)
 	}
+	log.Println("Exiting with code 1")
 	syscall.Exit(1)
 }
 
