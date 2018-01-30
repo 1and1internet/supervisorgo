@@ -1,21 +1,23 @@
 package managed_procs
 
 import (
-	"os/exec"
+	"fmt"
 	"log"
 	"os"
-	"time"
-	"strings"
+	"os/exec"
+	"os/user"
 	"reflect"
-	"fmt"
+	"strconv"
+	"strings"
 	"syscall"
+	"time"
 )
 
 type ProcStatus int
 
 // Ref: http://supervisord.org/subprocess.html#process-states
 const (
-	PROC_STOPPED  ProcStatus = iota
+	PROC_STOPPED ProcStatus = iota
 	PROC_STARTING
 	PROC_RUNNING
 	PROC_BACKOFF
@@ -40,12 +42,12 @@ type Program struct {
 }
 
 type RunningData struct {
-	programs  []*Program
-	allConfig AllConfig
+	programs   []*Program
+	allConfig  AllConfig
 	inShutDown bool
 }
 
-func stateToString(state ProcStatus) (string) {
+func stateToString(state ProcStatus) string {
 	switch state {
 	case PROC_STOPPED:
 		return "STOPPED"
@@ -106,8 +108,8 @@ func (allConfig AllConfig) InitialiseProcesses() []*Program {
 
 func (allConfig AllConfig) RunAllProcesses() {
 	runningData := RunningData{
-		programs: allConfig.InitialiseProcesses(),
-		allConfig: allConfig,
+		programs:   allConfig.InitialiseProcesses(),
+		allConfig:  allConfig,
 		inShutDown: false,
 	}
 	for _, prog := range runningData.programs {
@@ -210,7 +212,7 @@ func (prog *Program) TryRestart() {
 	}
 }
 
-func (program *Program) CanRestart() (bool) {
+func (program *Program) CanRestart() bool {
 	if program.programStatus == PROC_BACKOFF && program.startCount > program.config.StartRetries {
 		return false
 	}
@@ -239,7 +241,7 @@ func (program *Program) CanRestart() (bool) {
 	return false
 }
 
-func (program *Program) CreateCommand() (*exec.Cmd) {
+func (program *Program) CreateCommand() *exec.Cmd {
 	var cmd *exec.Cmd
 
 	if len(program.config.Command) > 1 {
@@ -261,7 +263,7 @@ func (program *Program) SetPriority() {
 	err = syscall.Setpriority(syscall.PRIO_PROCESS, cmd.Process.Pid, program.config.Priority)
 	if err == nil {
 		log.Printf("PRIORITY: Process %s priority set %d",
-				program.config.ProcessName, program.config.Priority)
+			program.config.ProcessName, program.config.Priority)
 
 	} else {
 		log.Printf("PRIORITY: Could not set priority for process %s", program.config.ProcessName)
@@ -294,8 +296,38 @@ func (program *Program) SetIO() {
 	program.command.Stderr = program.stderr
 }
 
+func (program *Program) MaybeSwitchUser(cmd *exec.Cmd) error {
+	if program.config.User != "" {
+		user, err := user.Lookup(program.config.User)
+		if err != nil {
+			log.Printf("WARNING: User %s not found", program.config.User)
+			return err
+		}
+
+		log.Printf("Attempting to run '%s' as user '%s'", program.config.ProcessName, program.config.User)
+		uid, erruid := strconv.ParseUint(user.Uid, 10, 32)
+		if erruid != nil {
+			log.Printf("Failed to convert %s to uid", user.Uid)
+			return erruid
+		}
+		gid, errgid := strconv.ParseUint(user.Gid, 10, 32)
+		if errgid != nil {
+			log.Printf("Failed to convert %s to gid", user.Gid)
+			return errgid
+		}
+		true_uid := uint32(uid)
+		true_gid := uint32(gid)
+		log.Printf("Using UID: %d, GID: %d", true_uid, true_gid)
+
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: true_uid, Gid: true_gid}
+	}
+	return nil
+}
+
 func (program *Program) RunSingleProcess() {
 	cmd := program.CreateCommand()
+	program.MaybeSwitchUser(cmd)
 
 	program.SetIO()
 	defer program.stdout.Close()
