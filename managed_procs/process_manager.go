@@ -325,7 +325,17 @@ func (program *Program) MaybeSwitchUser(cmd *exec.Cmd) error {
 	return nil
 }
 
+func (program *Program) InjectEnvironmentVariables() {
+	if program.config.Environment != "" {
+		for key, val := range program.config.GetEnvarMap() {
+			os.Setenv(key, val)
+		}
+	}
+}
+
 func (program *Program) RunSingleProcess() {
+	program.InjectEnvironmentVariables()
+
 	cmd := program.CreateCommand()
 	program.MaybeSwitchUser(cmd)
 

@@ -399,3 +399,20 @@ func (allConfig *AllConfig) LoadEventListener(section *ini.Section, name string)
 	}
 	allConfig.EventListeners[name] = eventListenerSection
 }
+
+func (configFileSection *ProgramConfigSection) GetEnvarMap() map[string]string {
+	envarmap := make(map[string]string)
+	for _, envar := range strings.Split(configFileSection.Environment, ",") {
+		envar_keyval := strings.Split(envar, "=")
+		if len(envar_keyval) == 2 {
+			key := envar_keyval[0]
+			val := envar_keyval[1]
+			if len(val) > 1 && strings.HasPrefix(val, "\"")  && strings.HasSuffix(val, "\"") {
+				val = strings.TrimPrefix(val, "\"")
+				val = strings.TrimSuffix(val, "\"")
+			}
+			envarmap[key] = val
+		}
+	}
+	return envarmap
+}
