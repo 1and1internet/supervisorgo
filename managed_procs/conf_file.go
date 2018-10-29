@@ -2,7 +2,7 @@ package managed_procs
 
 import (
 	"fmt"
-	"github.com/go-ini/ini"
+	"gopkg.in/go-ini/ini.v1"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -268,19 +268,18 @@ func GetDefaultProgramSection(name string) (ProgramConfigSection) {
 }
 
 func replaceCommandEnvars (origString string) string {
-	re := regexp.MustCompile(`%\((.*?)\)`)
+	re := regexp.MustCompile(`%\((.*?)\)s`)
 	return re.ReplaceAllStringFunc(origString, stripAndGetEnv)
 }
 
 func stripAndGetEnv(toreplace string) string {
-	re := regexp.MustCompile(`%\((.*?)\)`)
+	re := regexp.MustCompile(`%\((.*?)\)s`)
 	toreplace = re.ReplaceAllString(toreplace, "${1}")
 	return os.Getenv(toreplace)
 }
 
 func (configFileSection *ProgramConfigSection) LoadProgram(section *ini.Section, name string) {
 	var err error
-
 	for _, key := range section.KeyStrings() {
 		//fmt.Printf("		%s = %v\n", key, section.Key(key))
 
@@ -290,7 +289,8 @@ func (configFileSection *ProgramConfigSection) LoadProgram(section *ini.Section,
 		// becomes ["bash", "-c", "\"source stuff && do/otherStuff.sh\""]
 
 		if key == "command" {
-			commandParts := strings.Split(replaceCommandEnvars(section.Key(key).String()), " ")
+			value := *section.Key(key)
+			commandParts := strings.Split(replaceCommandEnvars(value.Value()), " ")
 			var realCommandParts []string
 			inQuotes := false
 			quoted := ""
