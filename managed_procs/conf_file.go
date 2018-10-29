@@ -1,11 +1,12 @@
 package managed_procs
 
 import (
-	"os"
-	"github.com/go-ini/ini"
-	"strings"
 	"fmt"
+	"github.com/go-ini/ini"
+	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 )
 
 type SuperConfigSection struct {
@@ -266,6 +267,17 @@ func GetDefaultProgramSection(name string) (ProgramConfigSection) {
 	return programSection
 }
 
+func replaceCommandEnvars (origString string) string {
+	re := regexp.MustCompile(`%\((.*?)\)`)
+	return re.ReplaceAllStringFunc(origString, stripAndGetEnv)
+}
+
+func stripAndGetEnv(toreplace string) string {
+	re := regexp.MustCompile(`%\((.*?)\)`)
+	toreplace = re.ReplaceAllString(toreplace, "${1}")
+	return os.Getenv(toreplace)
+}
+
 func (configFileSection *ProgramConfigSection) LoadProgram(section *ini.Section, name string) {
 	var err error
 
@@ -278,7 +290,7 @@ func (configFileSection *ProgramConfigSection) LoadProgram(section *ini.Section,
 		// becomes ["bash", "-c", "\"source stuff && do/otherStuff.sh\""]
 
 		if key == "command" {
-			commandParts := strings.Split(section.Key(key).String(), " ")
+			commandParts := strings.Split(replaceCommandEnvars(section.Key(key).String()), " ")
 			var realCommandParts []string
 			inQuotes := false
 			quoted := ""
