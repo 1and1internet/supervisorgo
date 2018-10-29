@@ -295,6 +295,9 @@ func (configFileSection *ProgramConfigSection) LoadProgram(section *ini.Section,
 			inQuotes := false
 			quoted := ""
 			for _, commandPart := range commandParts {
+				if commandPart == "" {
+					continue
+				}
 				if ! inQuotes && commandPart[0] == '"' {
 					inQuotes = true
 					quoted = commandPart[1:]
